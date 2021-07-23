@@ -1,39 +1,46 @@
+/* eslint-disable import/extensions */
 import { ApolloServer } from 'apollo-server';
-import { PrismaClient } from '@prisma/client';
+import PrismaClient from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
+import feed from './resolvers/Query.js';
+import links from './resolvers/User.js';
+import postedBy from './resolvers/Link.js';
+import { login, post, signup } from './resolvers/Mutation.js';
+import { getUserId } from './helpers.js';
 
 const dirname = path.resolve('./src');
 const schema = path.join(dirname, 'schema.graphql');
+const prisma = new PrismaClient.PrismaClient();
 
 const resolvers = {
   Query: {
-    info: () => 'This is the Hackernews Clone API',
-    feed: () => async (parent, args, context) => context.prisma.link.findMany(),
+    feed,
+  },
+  User: {
+    links,
+  },
+  Link: {
+    postedBy,
   },
   Mutation: {
-    post: (parent, args, context) => {
-      const newLink = context.prisma.lik.create({
-        data: {
-          url: args.url,
-          description: args.description,
-        },
-      });
-      return newLink;
-    },
+    login,
+    signup,
+    post,
   },
 };
 
-const prisma = new PrismaClient.PrismaClient();
 const server = new ApolloServer({
   typeDefs: fs.readFileSync(
     schema,
     'utf8',
   ),
   resolvers,
-  context: {
+  context: ({ req }) => ({
+    ...req,
     prisma,
-  },
+    userId: req && req.headers.authorization ? getUserId(req) : null,
+  }),
 });
 
 server
